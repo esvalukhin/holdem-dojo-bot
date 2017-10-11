@@ -19,7 +19,7 @@ enum class CardSuit(val figure: String) {
     override fun toString(): String = figure
 }
 
-fun String.cardSuit() : CardSuit = when (this) {
+fun String.cardSuit(): CardSuit = when (this) {
     CardSuit.CLUBS.figure -> CardSuit.CLUBS
     CardSuit.HEARTS.figure -> CardSuit.HEARTS
     CardSuit.SPADES.figure -> CardSuit.SPADES
@@ -33,7 +33,7 @@ enum class CardValue(val value: String) : Comparable<CardValue> {
     override fun toString(): String = value
 }
 
-fun String.cardValue() : CardValue = when (this) {
+fun String.cardValue(): CardValue = when (this) {
     CardValue.TWO.value -> CardValue.TWO
     CardValue.THREE.value -> CardValue.THREE
     CardValue.FOUR.value -> CardValue.FOUR
@@ -50,7 +50,7 @@ fun String.cardValue() : CardValue = when (this) {
     else -> throw IllegalStateException()
 }
 
-data class Card(private val cardValue: String, private val cardSuit: String) : Comparable<Card>  {
+data class Card(private val cardValue: String, private val cardSuit: String) : Comparable<Card> {
     private var _suit: CardSuit? = null
     private var _value: CardValue? = null
 
@@ -134,8 +134,8 @@ fun String.action(): Action = when (this) {
     "Check" -> Action.CHECK
     "Call" -> Action.CALL
     "Rise" -> Action.RISE
-    "AllIn"-> Action.ALL_IN
-    "NotMoved"-> Action.NOT_MOVED
+    "AllIn" -> Action.ALL_IN
+    "NotMoved" -> Action.NOT_MOVED
     "SmallBLind" -> Action.SMALL_BLIND
     "BigBlind" -> Action.BIG_BLIND
     else -> Action.NONE
@@ -177,100 +177,118 @@ interface Analyzer {
 }
 
 interface CombinationCheck {
-    fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>>
+    fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>?>
 }
 
-class OnePariCombinationCheck : CombinationCheck {
-    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>> {
-        val groupBy = cards.groupBy { it.value }
+class OnePairCombinationCheck : CombinationCheck {
+    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>?> {
+        val groupBy = cards.groupBy { it.value.value }
+//        println(groupBy)
         val filter = groupBy.filter { it.value.size >= 2 }
-        return Pair(filter.isNotEmpty(), filter.getOrDefault(filter.keys.first(), emptyList()))
+//        println(filter)
+        return if (filter.isEmpty()) Pair(false, emptyList()) else Pair(true, filter[filter.keys.first()])
     }
 }
 
 class TwoPairCombinationCheck : CombinationCheck {
-    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>> {
-        val groupBy = cards.groupBy { it.value }
+    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>?> {
+        val groupBy = cards.groupBy { it.value.value }
+//        println(groupBy)
         val filter = groupBy.filter { it.value.size >= 2 }
-        return Pair(filter.size ==2, filter.flatMap { it.value })
+//        println(filter)
+        return if (filter.isEmpty()) Pair(false, emptyList()) else Pair(true, filter.flatMap { it.value })
     }
 }
 
 class ThreeOfaKindCombinationCheck : CombinationCheck {
-    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>> {
-        val groupBy = cards.groupBy { it.value }
+    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>?> {
+        val groupBy = cards.groupBy { it.value.value }
+//        println(groupBy)
         val filter = groupBy.filter { it.value.size >= 3 }
-        return Pair(filter.isNotEmpty(), filter.getOrDefault(filter.keys.first(), emptyList()))
+//        println(filter)
+        return if (filter.isEmpty()) Pair(false, emptyList()) else Pair(true, filter[filter.keys.first()])
     }
 }
 
 class StraightCombinationCheck : CombinationCheck {
-    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>> {
+    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>?> {
         val sorted = cards.sorted()
+//        println(sorted)
         val zip = sorted.zip(sorted.drop(1))
-        return Pair(zip.all { abs(it.first.value.compareTo(it.second.value)) == 1}, sorted)
+//        println(zip)
+        return Pair(zip.all { abs(it.first.value.compareTo(it.second.value)) == 1 }, sorted)
     }
 }
 
 class FlushCombinationCheck : CombinationCheck {
-    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>> {
-        val groupBy = cards.groupBy { it.suit }
+    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>?> {
+        val groupBy = cards.groupBy { it.suit.figure }
+//        println (groupBy)
         return Pair(groupBy.size == 5, groupBy.getOrDefault(groupBy.keys.first(), emptyList()))
     }
 }
 
 class FullHouseCombinationCheck : CombinationCheck {
-    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>> {
-        val groupBy = cards.groupBy { it.value }
+    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>?> {
+        val groupBy = cards.groupBy { it.value.value }
         val containsPair = groupBy.filter { it.value.size == 2 }
-        val containsThreeOfaKind = groupBy.filter { it.value.size == 3}
+        val containsThreeOfaKind = groupBy.filter { it.value.size == 3 }
 
-        return Pair(containsPair.isNotEmpty() && containsThreeOfaKind.isNotEmpty(), containsPair)
+        val pairList = if (containsPair.isEmpty()) emptyList() else containsPair[containsPair.keys.first()].orEmpty()
+        val threeList = if (containsPair.isEmpty()) emptyList() else containsThreeOfaKind[containsPair.keys.first()].orEmpty()
+
+        return if (containsPair.isNotEmpty() && containsThreeOfaKind.isNotEmpty()) Pair(true, mutableListOf<Card>().plus(pairList).plus(threeList)) else Pair(false, emptyList())
+
     }
 }
 
 class FourOfaKindCombinationCheck : CombinationCheck {
-    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>> {
-        val groupBy = cards.groupBy { it.value }
+    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>?> {
+        val groupBy = cards.groupBy { it.value.value }
+//        println(groupBy)
         val filter = groupBy.filter { it.value.size >= 4 }
-        return Pair(filter.isNotEmpty(), filter.getOrDefault(filter.keys.first(), emptyList()))
+//        println(filter)
+        return if (filter.isEmpty()) Pair(false, emptyList()) else Pair(true, filter[filter.keys.first()])
     }
 }
 
 class StraightFlushCombinationCheck : CombinationCheck {
-    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>> {
+    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>?> {
         val sorted = cards.sorted()
+//        println(sorted)
         val zip = sorted.zip(sorted.drop(1))
+//        println(zip)
         return Pair(zip.all { it.first.suit == it.second.suit && abs(it.first.value.compareTo(it.second.value)) == 1 }, sorted)
     }
 }
 
 class RoyalFlushCombinationCheck : CombinationCheck {
-    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>> {
+    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>?> {
         val sorted = cards.sorted()
+//        println(sorted)
         val zip = sorted.zip(sorted.drop(1))
+//        println(zip)
         return Pair(zip.all { it.first.suit == it.second.suit } && sorted.first().value == CardValue.TEN && sorted.last().value == CardValue.ACE, sorted)
     }
 }
 
 class HighCardCombinationCheck : CombinationCheck {
-    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>> = Pair(true, listOf(cards.sorted().last()))
+    override fun checkForCombination(cards: List<Card>): Pair<Boolean, List<Card>?> = Pair(true, listOf(cards.sorted().last()))
 }
-
 
 
 class StrategyAnalyzer(val user: String) : Analyzer {
 
-    val strategies : Map<Action, Strategy> = mapOf(Action.FOLD to FoldStrategy(),
+    val strategies: Map<Action, Strategy> = mapOf(Action.FOLD to FoldStrategy(),
             Action.CHECK to CheckStrategy(),
             Action.CALL to CallStrategy(),
             Action.RISE to RiseStrategy(),
             Action.ALL_IN to AllInStrategy(),
             Action.NONE to DoNothingStrategy())
 
-    val combinationChecks : Map<Combination, CombinationCheck> = mapOf(
+    val combinationChecks: Map<Combination, CombinationCheck> = mapOf(
             Combination.HIGH_CARD to HighCardCombinationCheck(),
-            Combination.ONE_PAIR to OnePariCombinationCheck(),
+            Combination.ONE_PAIR to OnePairCombinationCheck(),
             Combination.TWO_PAIR to TwoPairCombinationCheck(),
             Combination.THREE_OF_A_KIND to ThreeOfaKindCombinationCheck(),
             Combination.STRAIGHT to StraightCombinationCheck(),
@@ -281,25 +299,90 @@ class StrategyAnalyzer(val user: String) : Analyzer {
             Combination.ROYAL_FLUSH to RoyalFlushCombinationCheck())
 
     var currentCombination: Combination = Combination.HIGH_CARD
+    var lastCombination: Combination = Combination.HIGH_CARD
+    var previousRound: Round = Round.FINAL
 
 
     override fun resolveStrategy(event: Event): Pair<Strategy?, Int> {
+
+        if (event.event[0] == "BLIND game round started.") {
+
+            lastCombination = Combination.HIGH_CARD
+        }
+
+        previousRound = event.gameRound
 
         if (event.mover != user && !event.event[0].endsWith("moves.")) {
             return Pair(strategies[Action.NONE], 0)
         }
 
+
         val myState = event.players.find { it.name == user && !it.cards.isEmpty() } ?: return Pair(strategies[Action.NONE], 0)
 
+        val newCombination = combination(myState.cards, event.deskCards)
+
+        val riseAmount = when {
+            myState.balance / 10000 > 1 -> 2500
+            myState.balance / 5000 > 1 -> 1250
+            myState.balance / 1000 > 1 -> 250
+            myState.balance / 500 > 1 -> 125
+            myState.balance / 100 > 1 -> 25
+            myState.balance / 50 > 1 -> 5
+            else -> 0
+        }
+
+        val combinationChanged = newCombination != lastCombination
+
+        println(newCombination)
+
         return when (event.gameRound) {
-            Round.BLIND -> when (myState.action) {
-                Action.BIG_BLIND, Action.SMALL_BLIND -> Pair(strategies[Action.CALL], 0)
-                else -> Pair(strategies[Action.NONE], 0)
+            Round.BLIND -> {
+                if (newCombination == Combination.TWO_PAIR) Pair(strategies[Action.RISE],riseAmount) else Pair(strategies[Action.CALL], 0)
             }
-            Round.THREE_CARDS -> Pair(strategies[Action.NONE], 0)
-            Round.FOUR_CARDS -> Pair(strategies[Action.NONE], 0)
-            Round.FIVE_CARDS -> Pair(strategies[Action.NONE], 0)
-            Round.FINAL -> Pair(strategies[Action.NONE], 0)
+            Round.THREE_CARDS -> {
+                when (newCombination) {
+                    Combination.ROYAL_FLUSH, Combination.STRAIGHT_FLUSH, Combination.FOUR_OF_A_KIND, Combination.FULL_HOUSE -> {
+                        return if (combinationChanged) Pair(strategies[Action.RISE], riseAmount) else Pair(strategies[Action.CHECK],0)
+                    }
+                    Combination.FLUSH, Combination.STRAIGHT, Combination.THREE_OF_A_KIND -> if (combinationChanged) Pair(strategies[Action.CALL], 0) else Pair(strategies[Action.CHECK],0)
+                    Combination.TWO_PAIR, Combination.ONE_PAIR -> Pair(strategies[Action.CHECK], 0)
+                    else -> Pair(strategies[Action.CHECK], 0)
+                }
+
+            }
+            Round.FOUR_CARDS -> {
+                when (newCombination) {
+                    Combination.ROYAL_FLUSH, Combination.STRAIGHT_FLUSH, Combination.FOUR_OF_A_KIND, Combination.FULL_HOUSE -> {
+                        return if (combinationChanged) Pair(strategies[Action.RISE], riseAmount) else Pair(strategies[Action.CHECK],0)
+                    }
+                    Combination.FLUSH, Combination.STRAIGHT, Combination.THREE_OF_A_KIND -> if (combinationChanged) Pair(strategies[Action.CALL], 0) else Pair(strategies[Action.CHECK],0)
+                    Combination.TWO_PAIR, Combination.ONE_PAIR -> Pair(strategies[Action.CHECK], 0)
+                    else -> Pair(strategies[Action.FOLD], 0)
+                }
+
+            }
+            Round.FIVE_CARDS -> {
+                when (newCombination) {
+                    Combination.ROYAL_FLUSH, Combination.STRAIGHT_FLUSH, Combination.FOUR_OF_A_KIND, Combination.FULL_HOUSE -> {
+                        return if (combinationChanged) Pair(strategies[Action.RISE], riseAmount) else Pair(strategies[Action.CHECK],0)
+                    }
+                    Combination.FLUSH, Combination.STRAIGHT, Combination.THREE_OF_A_KIND -> if (combinationChanged) Pair(strategies[Action.CALL], 0) else Pair(strategies[Action.CHECK],0)
+                    Combination.TWO_PAIR, Combination.ONE_PAIR -> Pair(strategies[Action.CHECK], 0)
+                    else -> Pair(strategies[Action.FOLD], 0)
+                }
+
+            }
+            Round.FINAL -> {
+                when (newCombination) {
+                    Combination.ROYAL_FLUSH, Combination.STRAIGHT_FLUSH, Combination.FOUR_OF_A_KIND, Combination.FULL_HOUSE -> {
+                        return Pair(strategies[Action.RISE], riseAmount)
+                    }
+                    Combination.FLUSH, Combination.STRAIGHT, Combination.THREE_OF_A_KIND -> if (combinationChanged) Pair(strategies[Action.CALL], 0) else Pair(strategies[Action.CHECK],0)
+                    Combination.TWO_PAIR, Combination.ONE_PAIR -> Pair(strategies[Action.CHECK], 0)
+                    else -> Pair(strategies[Action.FOLD], 0)
+                }
+
+            }
         }
     }
 
@@ -310,11 +393,32 @@ class StrategyAnalyzer(val user: String) : Analyzer {
 
         cards.sort()
 
-        var lastCombination = Combination.HIGH_CARD
 
-        for (i in 1..Combination.values().size) {
+        for (i in currentCombination.ordinal..Combination.values().size-1) {
 
+//            println(LocalDateTime.now().toString().plus(" index is ".plus(i)))
+
+            val checkedCombination = Combination.values()[i]
+
+//            println(LocalDateTime.now().toString().plus(" Checking now combination ".plus(checkedCombination)))
+
+//            println(cards)
+            val (isWinCombination, combinationCards) = combinationChecks[checkedCombination]!!.checkForCombination(cards)
+
+//            println("Is combination winnable ".plus(isWinCombination))
+//            println(combinationCards)
+
+            if (isWinCombination) {
+//                println(LocalDateTime.now().toString().plus(" Current combination ".plus(checkedCombination)))
+//                println(LocalDateTime.now().toString().plus(" Cards ".plus(combinationCards)))
+                currentCombination = checkedCombination
+            }
         }
+
+        println(LocalDateTime.now().toString().plus(" Combination ".plus(currentCombination)))
+
+        return currentCombination
+
     }
 }
 
@@ -335,7 +439,11 @@ class HoldemListener(val analyzer: Analyzer) : WebSocketListener() {
         if (strategy != null) {
             webSocket?.send(strategy.action(bet))
         }
+    }
 
+    override fun onClosing(webSocket: WebSocket?, code: Int, reason: String?) {
+        super.onClosing(webSocket, code, reason)
+        webSocket?.close(code, reason)
     }
 
 
@@ -359,13 +467,20 @@ fun main(args: Array<String>) {
 //
 //    val password = options.find { ""}
 
-    val connectionString = "ws://localhost:8080/ws?user=user&password=password"
+
+    val user = "eugene-bot"
+
+    val password = "pass"
+    val host = "10.14.160.149"
+//    val host = "localhost"
+
+    val connectionString = "ws://".plus(host).plus(":8080/ws?user=").plus(user).plus("&password=").plus(password)
 
     val client = OkHttpClient()
 
     val request = Request.Builder().url(connectionString).build()
 
-    val newWebSocket = client.newWebSocket(request, HoldemListener(StrategyAnalyzer("user")))
+    val newWebSocket = client.newWebSocket(request, HoldemListener(StrategyAnalyzer(user)))
 
 
 }
